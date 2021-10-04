@@ -768,7 +768,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     printInfo("finding garbage collector roots...");
     Roots rootMap;
     if (!options.ignoreLiveness)
-        findRootsNoTemp(rootMap, true);
+        rootMap = findRoots(true);
 
     for (auto & i : rootMap) state.roots.insert(i.first);
 
