@@ -900,10 +900,14 @@ public:
             `type` is either `OAuth2` or `PAT` to indicate which type
             of token is being specified.
 
+          * SourceHut: the token value is the string obtained either
+            as the Personal Access Token (https://meta.sr.ht/oauth2/personal-token),
+            or through OAuth2.
+
           Example `~/.config/nix/nix.conf`:
 
           ```
-          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk
+          access-tokens = github.com=23ac...b289 gitlab.mycompany.com=PAT:A123Bp_Cd..EfG gitlab.com=OAuth2:1jklw3jk git.sr.ht=ACiMP...KI1c
           ```
 
           Example `~/code/flake.nix`:

@@ -17,7 +17,7 @@ struct DownloadUrl
     Headers headers;
 };
 
-// A github or gitlab host
+// A github, gitlab, or sourcehut host
 const static std::string hostRegexS = "[a-zA-Z0-9.]*"; // FIXME: check
 std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
@@ -348,7 +348,57 @@ struct GitLabInputScheme : GitArchiveInputScheme
     }
 };
 
+struct SourceHutInputScheme : GitArchiveInputScheme
+{
+    std::string type() override { return "sourcehut"; }
+
+    std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
+    {
+        // SourceHut supports both PAT and OAuth2. See
+        // https://man.sr.ht/meta.sr.ht/oauth.md
+        return std::pair<std::string, std::string>("Authorization", fmt("Bearer %s", token));
+    }
+
+    Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
+    {
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
+        auto url = fmt("https://%s/query?query=query{repositoryByOwner(owner:\"%s\",repo:\"%s\"){revparse_single(revspec:\"%s\"){id}}}",
+            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+
+        Headers headers = makeHeadersWithAuthTokens(host);
+
+        auto json = nlohmann::json::parse(
+            readFile(
+                store->toRealPath(
+                    downloadFile(store, url, "source", false, headers).storePath)));
+        auto rev = Hash::parseAny(std::string { json["data"]["repositoryByOwner"]["revparse_single"]["id"] }, htSHA1);
+        debug("HEAD revision for '%s' is %s", url, rev.gitRev());
+        return rev;
+    }
+
+    DownloadUrl getDownloadUrl(const Input & input) const override
+    {
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
+        auto url = fmt("https://%s/%s/%s/archive/%s.tar.gz",
+            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"),
+            input.getRev()->to_string(Base16, false));
+
+        Headers headers = makeHeadersWithAuthTokens(host);
+        return DownloadUrl { url, headers };
+    }
+
+    void clone(const Input & input, const Path & destDir) override
+    {
+        auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
+        Input::fromURL(fmt("git+https://%s/%s/%s",
+                host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
+            .applyOverrides(input.getRef(), input.getRev())
+            .clone(destDir);
+    }
+};
+
 static auto rGitHubInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
 static auto rGitLabInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
+static auto rSourceHutInputScheme = OnStartup([] { registerInputScheme(std::make_unique<SourceHutInputScheme>()); });
 
 }
