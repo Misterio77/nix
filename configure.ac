@@ -202,6 +202,8 @@ if test "$machine_name" = "x86_64"; then
 fi
 AC_SUBST(HAVE_LIBCPUID, [$have_libcpuid])
 
+# Look for pugixml library.
+PKG_CHECK_MODULES([LIBPUGIXML], [pugixml >= 1.11], [CXXFLAGS="$LIBPUGIXML_CFLAGS $CXXFLAGS"])
 
 # Look for libseccomp, required for Linux sandboxing.
 case "$host_os" in
