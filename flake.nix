@@ -91,6 +91,7 @@
             boost
             lowdown-nix
             gmock
+            tinyxml-2
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium

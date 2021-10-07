@@ -8,6 +8,7 @@
 
 #include <optional>
 #include <nlohmann/json.hpp>
+#include <tinyxml2.h>
 
 namespace nix::fetchers {
 
@@ -357,21 +358,38 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         // SourceHut supports both PAT and OAuth2. See
         // https://man.sr.ht/meta.sr.ht/oauth.md
         return std::pair<std::string, std::string>("Authorization", fmt("Bearer %s", token));
+        // Note: This currently serves no purpose, as this kind of authorization
+        // does not allow for downloading tarballs on sourcehut private repos.
+        // Once it is implemented, however, should work as expected.
     }
 
     Hash getRevFromRef(nix::ref<Store> store, const Input & input) const override
     {
+        auto ref = *input.getRef();
+        if (ref == "HEAD") {
+            ref = "";
+        } else {
+            ref = fmt("/%s", ref);
+        }
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
-        auto url = fmt("https://%s/query?query=query{repositoryByOwner(owner:\"%s\",repo:\"%s\"){revparse_single(revspec:\"%s\"){id}}}",
-            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), *input.getRef());
+        auto url = fmt("https://%s/%s/%s/log%s/rss.xml",
+            host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"), ref);
 
         Headers headers = makeHeadersWithAuthTokens(host);
 
-        auto json = nlohmann::json::parse(
-            readFile(
-                store->toRealPath(
-                    downloadFile(store, url, "source", false, headers).storePath)));
-        auto rev = Hash::parseAny(std::string { json["data"]["repositoryByOwner"]["revparse_single"]["id"] }, htSHA1);
+        std::string xmlFile = store->toRealPath(
+                downloadFile(store, url, "source", false, headers).storePath);
+
+        tinyxml2::XMLDocument xml;
+        xml.LoadFile(xmlFile.c_str());
+
+        auto textNode = xml.FirstChildElement("rss")->FirstChildElement("channel")
+            ->FirstChildElement("item")->FirstChildElement("link")->ToText();
+
+        std::string commitUrl = textNode->Value();
+        auto id = commitUrl.substr(commitUrl.find("commit/")+7, commitUrl.length()-1);
+
+        auto rev = Hash::parseAny(id, htSHA1);
         debug("HEAD revision for '%s' is %s", url, rev.gitRev());
         return rev;
     }
