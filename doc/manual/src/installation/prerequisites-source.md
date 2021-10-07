@@ -26,6 +26,10 @@
     available for download from the official repository
     <https://github.com/google/brotli>.
 
+  - The `libpugixml` library to deserialize XML. If your distribution
+    does not provide it, you can get it from
+    <https://github.com/zeux/pugixml>.
+
   - cURL and its library. If your distribution does not provide it, you
     can get it from <https://curl.haxx.se/>.
 

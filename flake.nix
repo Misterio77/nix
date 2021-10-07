@@ -91,6 +91,7 @@
             boost
             lowdown
             gmock
+            pugixml
           ]
           ++ lib.optionals stdenv.isLinux [libseccomp]
           ++ lib.optional (stdenv.isLinux || stdenv.isDarwin) libsodium
